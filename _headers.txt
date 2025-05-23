@@ -1,4 +1,0 @@
-/*
-  X-Frame-Options: ALLOW-FROM data:
-  Content-Security-Policy: default-src 'self' https: 'unsafe-inline' 'unsafe-eval';
-  Access-Control-Allow-Origin: *
