@@ -29,7 +29,9 @@
 
     const data = getDataFromUrl();
 
-    require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer", "esri/Graphic"], function (Map, MapView, FeatureLayer, Graphic) {
+    require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer", "esri/Graphic", "esri/geometry/geometryEngine"], 
+      function (Map, MapView, FeatureLayer, Graphic, geometryEngine) {
+      
       const map = new Map({
         basemap: "streets-night-vector"
       });
@@ -41,6 +43,7 @@
         zoom: 14
       });
 
+      // Create graphics from data with ObjectID and weight attributes
       const graphics = data.map(function (item, index) {
         return new Graphic({
           geometry: {
@@ -49,7 +52,7 @@
             x: item.lon
           },
           attributes: {
-            ObjectID: Math.floor(Math.random() * 100000),
+            ObjectID: index + 1,
             weight: item.weight || 1
           }
         });
@@ -80,6 +83,51 @@
       });
 
       map.add(heatmapLayer);
+
+      // Click event on view to find nearest graphic and show popup with details
+      view.on("click", function(event) {
+        const clickPoint = event.mapPoint;
+
+        // Define a search distance in map units (~meters in WebMercator)
+        const searchDistance = 50; // Adjust if needed
+
+        // Buffer the click point
+        const buffer = geometryEngine.geodesicBuffer(clickPoint, searchDistance, "meters");
+
+        // Find graphics within the buffer
+        const nearbyGraphics = graphics.filter(graphic => {
+          return geometryEngine.intersects(graphic.geometry, buffer);
+        });
+
+        if (nearbyGraphics.length > 0) {
+          // If multiple found, pick the closest
+          nearbyGraphics.sort((a, b) => {
+            const distA = geometryEngine.distance(clickPoint, a.geometry, "meters");
+            const distB = geometryEngine.distance(clickPoint, b.geometry, "meters");
+            return distA - distB;
+          });
+
+          const nearestGraphic = nearbyGraphics[0];
+          const geom = nearestGraphic.geometry;
+          const lat = geom.latitude || geom.y;
+          const lon = geom.longitude || geom.x;
+          const weight = nearestGraphic.attributes.weight;
+
+          // Show popup at clicked location with info
+          view.popup.open({
+            title: "Heatmap Point Info",
+            location: clickPoint,
+            content: `
+              <b>Latitude:</b> ${lat.toFixed(6)}<br/>
+              <b>Longitude:</b> ${lon.toFixed(6)}<br/>
+              <b>Weight:</b> ${weight}
+            `
+          });
+        } else {
+          view.popup.close();
+        }
+      });
+
     });
   </script>
 </body>
