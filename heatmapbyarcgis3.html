@@ -29,106 +29,116 @@
 
     const data = getDataFromUrl();
 
-    require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer", "esri/Graphic", "esri/geometry/geometryEngine"], 
-      function (Map, MapView, FeatureLayer, Graphic, geometryEngine) {
-      
-      const map = new Map({
-        basemap: "streets-night-vector"
-      });
+    require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer", "esri/Graphic"], 
+  function (Map, MapView, FeatureLayer, Graphic) {
+  
+  const map = new Map({
+    basemap: "streets-night-vector"
+  });
 
-      const view = new MapView({
-        container: "viewDiv",
-        map: map,
-        center: [-79.7596, 43.6850],
-        zoom: 14
-      });
+  const view = new MapView({
+    container: "viewDiv",
+    map: map,
+    center: [-79.7596, 43.6850],
+    zoom: 14
+  });
 
-      // Create graphics from data with ObjectID and weight attributes
-      const graphics = data.map(function (item, index) {
-        return new Graphic({
-          geometry: {
-            type: "point",
-            y: item.lat,
-            x: item.lon
-          },
-          attributes: {
-            ObjectID: index + 1,
-            weight: item.weight || 1
-          }
-        });
-      });
-
-      const heatmapLayer = new FeatureLayer({
-        source: graphics,
-        objectIdField: "ObjectID",
-        fields: [
-          { name: "ObjectID", type: "oid" },
-          { name: "weight", type: "double" }
-        ],
-        geometryType: "point",
-        spatialReference: { wkid: 4326 },
-        renderer: {
-          type: "heatmap",
-          field: "weight",
-          colorStops: [
-            { ratio: 0, color: "rgba(255,255,255,0)" },
-            { ratio: 0.2, color: "cyan" },
-            { ratio: 0.5, color: "blue" },
-            { ratio: 0.8, color: "red" },
-            { ratio: 1, color: "yellow" }
-          ],
-          maxPixelIntensity: 10,
-          minPixelIntensity: 0
-        }
-      });
-
-      map.add(heatmapLayer);
-
-      // Click event on view to find nearest graphic and show popup with details
-      view.on("click", function(event) {
-        const clickPoint = event.mapPoint;
-
-        // Define a search distance in map units (~meters in WebMercator)
-        const searchDistance = 50; // Adjust if needed
-
-        // Buffer the click point
-        const buffer = geometryEngine.geodesicBuffer(clickPoint, searchDistance, "meters");
-
-        // Find graphics within the buffer
-        const nearbyGraphics = graphics.filter(graphic => {
-          return geometryEngine.intersects(graphic.geometry, buffer);
-        });
-
-        if (nearbyGraphics.length > 0) {
-          // If multiple found, pick the closest
-          nearbyGraphics.sort((a, b) => {
-            const distA = geometryEngine.distance(clickPoint, a.geometry, "meters");
-            const distB = geometryEngine.distance(clickPoint, b.geometry, "meters");
-            return distA - distB;
-          });
-
-          const nearestGraphic = nearbyGraphics[0];
-          const geom = nearestGraphic.geometry;
-          const lat = geom.latitude || geom.y;
-          const lon = geom.longitude || geom.x;
-          const weight = nearestGraphic.attributes.weight;
-
-          // Show popup at clicked location with info
-          view.popup.open({
-            title: "Heatmap Point Info",
-            location: clickPoint,
-            content: `
-              <b>Latitude:</b> ${lat.toFixed(6)}<br/>
-              <b>Longitude:</b> ${lon.toFixed(6)}<br/>
-              <b>Weight:</b> ${weight}
-            `
-          });
-        } else {
-          view.popup.close();
-        }
-      });
-
+  const graphics = data.map(function (item, index) {
+    return new Graphic({
+      geometry: {
+        type: "point",
+        y: item.lat,
+        x: item.lon
+      },
+      attributes: {
+        ObjectID: index + 1,
+        weight: item.weight || 1
+      }
     });
+  });
+
+  // Heatmap layer for visualization
+  const heatmapLayer = new FeatureLayer({
+    source: graphics,
+    objectIdField: "ObjectID",
+    fields: [
+      { name: "ObjectID", type: "oid" },
+      { name: "weight", type: "double" }
+    ],
+    geometryType: "point",
+    spatialReference: { wkid: 4326 },
+    renderer: {
+      type: "heatmap",
+      field: "weight",
+      colorStops: [
+        { ratio: 0, color: "rgba(255,255,255,0)" },
+        { ratio: 0.2, color: "cyan" },
+        { ratio: 0.5, color: "blue" },
+        { ratio: 0.8, color: "red" },
+        { ratio: 1, color: "yellow" }
+      ],
+      maxPixelIntensity: 10,
+      minPixelIntensity: 0
+    }
+  });
+
+  // Transparent point layer on top for hit-testing and popup
+  const pointLayer = new FeatureLayer({
+    source: graphics,
+    objectIdField: "ObjectID",
+    fields: [
+      { name: "ObjectID", type: "oid" },
+      { name: "weight", type: "double" }
+    ],
+    geometryType: "point",
+    spatialReference: { wkid: 4326 },
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "simple-marker",
+        size: 0.1,  // very small marker, almost invisible
+        color: [0, 0, 0, 0] // fully transparent
+      }
+    },
+    // Enable hit testing for popup on this layer
+    popupTemplate: {
+      title: "Point Details",
+      content: (feature) => {
+        const lat = feature.geometry.latitude || feature.geometry.y;
+        const lon = feature.geometry.longitude || feature.geometry.x;
+        return `
+          <b>Latitude:</b> ${lat.toFixed(6)}<br/>
+          <b>Longitude:</b> ${lon.toFixed(6)}<br/>
+          <b>Weight:</b> ${feature.attributes.weight}
+        `;
+      }
+    }
+  });
+
+  map.add(heatmapLayer);
+  map.add(pointLayer);
+
+  // Click handler - use hitTest on the pointLayer to find clicked points
+  view.on("click", function(event) {
+    view.hitTest(event).then(function(response) {
+      const results = response.results.filter(result => {
+        // Filter for graphics from pointLayer only
+        return result.graphic.layer === pointLayer;
+      });
+
+      if (results.length > 0) {
+        // Show popup on first hit
+        view.popup.open({
+          location: event.mapPoint,
+          features: [results[0].graphic]
+        });
+      } else {
+        view.popup.close();
+      }
+    });
+  });
+
+});
   </script>
 </body>
 </html>
