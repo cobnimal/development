@@ -41,7 +41,7 @@
         zoom: 14
       });
 
-      const graphics = data.map(function (item) {
+      const graphics = data.map(function (item, index) {
         return new Graphic({
           geometry: {
             type: "point",
