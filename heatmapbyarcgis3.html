@@ -126,31 +126,33 @@
                             map.addMany([heatmapLayer, pointLayer]);
 
       // Hover logic
-view.whenLayerView(transparentPointLayer).then((layerView) => {
-  let lastId = null;
+view.whenLayerView(transparentPointLayer).then(function(layerView) {
+        let lastId = null;
 
-  view.on("pointer-move", function(event) {
-    view.hitTest(event).then(function(response) {
-      const result = response.results.find(r => r.graphic.layer === transparentPointLayer);
+        view.on("pointer-move", function(event) {
+          view.hitTest(event).then(function(response) {
+            const result = response.results.find(r => r.graphic?.layer === transparentPointLayer);
 
-      if (result && result.graphic.attributes.ObjectID !== lastId) {
-        lastId = result.graphic.attributes.ObjectID;
-        view.popup.open({
-          location: result.mapPoint,
-          title: "Point Details",
-          content: `
-            <b>Latitude:</b> ${result.graphic.attributes.latitude}<br/>
-            <b>Longitude:</b> ${result.graphic.attributes.longitude}<br/>
-            <b>Weight:</b> ${result.graphic.attributes.weight}
-          `
+            if (result && result.graphic.attributes.ObjectID !== lastId) {
+              lastId = result.graphic.attributes.ObjectID;
+              const attrs = result.graphic.attributes;
+
+              view.popup.open({
+                location: result.mapPoint,
+                title: "Point Details",
+                content: `
+                  <b>Latitude:</b> ${attrs.latitude}<br/>
+                  <b>Longitude:</b> ${attrs.longitude}<br/>
+                  <b>Weight:</b> ${attrs.weight}
+                `
+              });
+            } else if (!result) {
+              lastId = null;
+              view.popup.close();
+            }
+          });
         });
-      } else if (!result) {
-        lastId = null;
-        view.popup.close();
-      }
-    });
-  });
-});
+      });
 
 
 
