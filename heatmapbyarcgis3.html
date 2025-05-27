@@ -9,7 +9,6 @@
     <style>
       html, body, #viewDiv {
         height: 100%;
-        width: 100%;
         margin: 0;
         padding: 0;
       }
@@ -40,12 +39,31 @@
         "esri/Graphic"
       ], function(Map, MapView, FeatureLayer, Graphic) {
 
-        const graphics = data.map((item, index) => {
+        // Create separate graphic arrays
+        const heatmapGraphics = data.map((item, index) => {
           return new Graphic({
             geometry: {
               type: "point",
               longitude: item.lon,
-              latitude: item.lat
+              latitude: item.lat,
+              spatialReference: { wkid: 4326 }
+            },
+            attributes: {
+              ObjectID: index + 1,
+              latitude: item.lat,
+              longitude: item.lon,
+              weight: item.weight || 1
+            }
+          });
+        });
+
+        const hoverGraphics = data.map((item, index) => {
+          return new Graphic({
+            geometry: {
+              type: "point",
+              longitude: item.lon,
+              latitude: item.lat,
+              spatialReference: { wkid: 4326 }
             },
             attributes: {
               ObjectID: index + 1,
@@ -64,10 +82,11 @@
         ];
 
         const heatmapLayer = new FeatureLayer({
-          source: graphics,
+          source: heatmapGraphics,
           fields: fields,
           objectIdField: "ObjectID",
           geometryType: "point",
+          spatialReference: { wkid: 4326 },
           renderer: {
             type: "heatmap",
             field: "weight"
@@ -75,15 +94,16 @@
         });
 
         const transparentPointLayer = new FeatureLayer({
-          source: graphics,
+          source: hoverGraphics,
           fields: fields,
           objectIdField: "ObjectID",
           geometryType: "point",
+          spatialReference: { wkid: 4326 },
           renderer: {
             type: "simple",
             symbol: {
               type: "simple-marker",
-              color: [255, 255, 255, 0.01], // almost invisible
+              color: [255, 255, 255, 0.01], // invisible
               size: 20,
               outline: null
             }
@@ -92,7 +112,7 @@
 
         const map = new Map({
           basemap: "streets-night-vector",
-          layers: [heatmapLayer, transparentPointLayer] // important: layers are added here
+          layers: [heatmapLayer, transparentPointLayer]
         });
 
         const view = new MapView({
@@ -103,8 +123,7 @@
         });
 
         view.when(() => {
-          // Only run after view is fully initialized
-          view.whenLayerView(transparentPointLayer).then((layerView) => {
+          view.whenLayerView(transparentPointLayer).then(() => {
             let lastId = null;
 
             view.on("pointer-move", (event) => {
