@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>ArcGIS Heatmap with Hover Popup</title>
+    <title>ArcGIS Heatmap with Hover</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
     <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
     <script src="https://js.arcgis.com/4.29/"></script>
@@ -19,13 +19,10 @@
     <script>
       function getDataFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const raw = params.get("data");
-        if (!raw) return [];
-
         try {
-          return JSON.parse(decodeURIComponent(raw));
+          return JSON.parse(params.get("data")) || [];
         } catch (e) {
-          console.error("Invalid 'data' parameter", e);
+          console.error("Invalid data parameter", e);
           return [];
         }
       }
@@ -35,41 +32,26 @@
       require([
         "esri/Map",
         "esri/views/MapView",
-        "esri/layers/FeatureLayer",
-        "esri/Graphic"
-      ], function(Map, MapView, FeatureLayer, Graphic) {
+        "esri/Graphic",
+        "esri/layers/FeatureLayer"
+      ], function(Map, MapView, Graphic, FeatureLayer) {
+        if (data.length === 0) {
+          alert("No heatmap data found in URL.");
+          return;
+        }
 
-        // Create separate graphic arrays
-        const heatmapGraphics = data.map((item, index) => {
+        const graphics = data.map((item, index) => {
           return new Graphic({
             geometry: {
               type: "point",
-              longitude: item.lon,
               latitude: item.lat,
-              spatialReference: { wkid: 4326 }
+              longitude: item.lon
             },
             attributes: {
               ObjectID: index + 1,
               latitude: item.lat,
               longitude: item.lon,
-              weight: item.weight || 1
-            }
-          });
-        });
-
-        const hoverGraphics = data.map((item, index) => {
-          return new Graphic({
-            geometry: {
-              type: "point",
-              longitude: item.lon,
-              latitude: item.lat,
-              spatialReference: { wkid: 4326 }
-            },
-            attributes: {
-              ObjectID: index + 1,
-              latitude: item.lat,
-              longitude: item.lon,
-              weight: item.weight || 1
+              weight: item.weight
             }
           });
         });
@@ -82,66 +64,74 @@
         ];
 
         const heatmapLayer = new FeatureLayer({
-          source: heatmapGraphics,
+          source: graphics,
           fields: fields,
           objectIdField: "ObjectID",
           geometryType: "point",
-          spatialReference: { wkid: 4326 },
           renderer: {
             type: "heatmap",
-            field: "weight"
-          }
+            field: "weight",
+            colorStops: [
+              { ratio: 0, color: "rgba(255, 255, 255, 0)" },
+              { ratio: 0.2, color: "blue" },
+              { ratio: 0.4, color: "cyan" },
+              { ratio: 0.6, color: "lime" },
+              { ratio: 0.8, color: "yellow" },
+              { ratio: 1, color: "red" }
+            ],
+            maxPixelIntensity: 25,
+            minPixelIntensity: 1
+          },
+          spatialReference: { wkid: 4326 }
         });
 
-        const transparentPointLayer = new FeatureLayer({
-          source: hoverGraphics,
+        const hoverLayer = new FeatureLayer({
+          source: graphics,
           fields: fields,
           objectIdField: "ObjectID",
           geometryType: "point",
-          spatialReference: { wkid: 4326 },
           renderer: {
             type: "simple",
             symbol: {
               type: "simple-marker",
-              color: [255, 255, 255, 0.01], // invisible
+              color: [255, 255, 255, 0],
               size: 20,
               outline: null
             }
-          }
+          },
+          spatialReference: { wkid: 4326 }
         });
 
         const map = new Map({
           basemap: "streets-night-vector",
-          layers: [heatmapLayer, transparentPointLayer]
+          layers: [heatmapLayer, hoverLayer]
         });
 
         const view = new MapView({
           container: "viewDiv",
           map: map,
-          center: [-79.75, 43.69],
+          center: [data[0].lon, data[0].lat],
           zoom: 13
         });
 
         view.when(() => {
-          view.whenLayerView(transparentPointLayer).then(() => {
+          view.whenLayerView(hoverLayer).then(() => {
             let lastId = null;
-
             view.on("pointer-move", (event) => {
               view.hitTest(event).then((response) => {
                 const result = response.results.find(
-                  (r) => r.graphic?.layer === transparentPointLayer
+                  (r) => r.graphic?.layer === hoverLayer
                 );
 
                 if (result && result.graphic.attributes.ObjectID !== lastId) {
                   lastId = result.graphic.attributes.ObjectID;
                   const attrs = result.graphic.attributes;
-
                   view.popup.open({
                     location: result.mapPoint,
-                    title: "Point Details",
+                    title: "Point Info",
                     content: `
-                      <b>Latitude:</b> ${attrs.latitude}<br/>
-                      <b>Longitude:</b> ${attrs.longitude}<br/>
+                      <b>Lat:</b> ${attrs.latitude}<br>
+                      <b>Lon:</b> ${attrs.longitude}<br>
                       <b>Weight:</b> ${attrs.weight}
                     `
                   });
