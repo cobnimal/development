@@ -126,29 +126,30 @@
                             map.addMany([heatmapLayer, pointLayer]);
 
       // Hover logic
-      let lastFeatureId = null;
+      let lastId = null;
 
-      view.on("pointer-move", function (event) {
-        view.hitTest(event).then(function (response) {
-          const result = response.results.find(r => r.graphic.layer === pointLayer);
-          if (result && result.graphic.attributes.ObjectID !== lastFeatureId) {
-            lastFeatureId = result.graphic.attributes.ObjectID;
+      view.on("pointer-move", function(event) {
+        view.hitTest(event).then(function(response) {
+          const result = response.results.find(r => r.graphic.layer === transparentPointLayer);
 
+          if (result && result.graphic.attributes.ObjectID !== lastId) {
+            lastId = result.graphic.attributes.ObjectID;
             view.popup.open({
+              location: result.mapPoint,
               title: "Point Details",
               content: `
                 <b>Latitude:</b> ${result.graphic.attributes.latitude}<br/>
                 <b>Longitude:</b> ${result.graphic.attributes.longitude}<br/>
                 <b>Weight:</b> ${result.graphic.attributes.weight}
-              `,
-              location: result.graphic.geometry
+              `
             });
           } else if (!result) {
-            lastFeatureId = null;
+            lastId = null;
             view.popup.close();
           }
         });
       });
+
 
 
     });
