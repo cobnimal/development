@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>ArcGIS Heatmap Clickable Points</title>
+  <title>ArcGIS Heatmap with Clickable Points</title>
   <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
   <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
   <script src="https://js.arcgis.com/4.29/"></script>
@@ -31,9 +31,9 @@
     const data = getDataFromUrl();
 
     require([
-      "esri/Map", 
-      "esri/views/MapView", 
-      "esri/layers/FeatureLayer", 
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
       "esri/Graphic"
     ], function (Map, MapView, FeatureLayer, Graphic) {
 
@@ -48,21 +48,23 @@
         zoom: 14
       });
 
-      const graphics = data.map(function (item, index) {
+      const graphics = data.map((item, index) => {
         return new Graphic({
           geometry: {
             type: "point",
-            y: item.lat,
-            x: item.lon
+            latitude: item.lat,
+            longitude: item.lon
           },
           attributes: {
             ObjectID: index + 1,
-            weight: item.weight || 1
+            weight: item.weight || 1,
+            latitude: item.lat,
+            longitude: item.lon
           }
         });
       });
 
-      // Heatmap layer
+      // Heatmap Layer (not clickable)
       const heatmapLayer = new FeatureLayer({
         source: graphics,
         objectIdField: "ObjectID",
@@ -87,13 +89,15 @@
         }
       });
 
-      // Transparent point layer on top for click interaction
+      // Transparent Point Layer (clickable with popups)
       const pointLayer = new FeatureLayer({
         source: graphics,
         objectIdField: "ObjectID",
         fields: [
           { name: "ObjectID", type: "oid" },
-          { name: "weight", type: "double" }
+          { name: "weight", type: "double" },
+          { name: "latitude", type: "double" },
+          { name: "longitude", type: "double" }
         ],
         geometryType: "point",
         spatialReference: { wkid: 4326 },
@@ -101,20 +105,19 @@
           type: "simple",
           symbol: {
             type: "simple-marker",
-            size: 6,
-            color: "rgba(0, 0, 0, 0.01)", // nearly transparent but hittable
+            size: 8,
+            color: "rgba(255,255,255,0.01)", // transparent but clickable
             outline: null
           }
         },
         popupTemplate: {
-          title: "Point Details",
-          content: function(feature) {
-            const lat = feature.geometry.latitude || feature.geometry.y;
-            const lon = feature.geometry.longitude || feature.geometry.x;
+          title: "Heatmap Point Info",
+          content: function (feature) {
+            const attrs = feature.graphic.attributes;
             return `
-              <b>Latitude:</b> ${lat.toFixed(6)}<br/>
-              <b>Longitude:</b> ${lon.toFixed(6)}<br/>
-              <b>Weight:</b> ${feature.attributes.weight}
+              <b>Latitude:</b> ${attrs.latitude}<br/>
+              <b>Longitude:</b> ${attrs.longitude}<br/>
+              <b>Weight:</b> ${attrs.weight}
             `;
           }
         }
@@ -123,21 +126,6 @@
       map.add(heatmapLayer);
       map.add(pointLayer);
 
-      view.whenLayerView(pointLayer).then(() => {
-        view.on("click", function(event) {
-          view.hitTest(event).then(function(response) {
-            const results = response.results.filter(result => result.graphic.layer === pointLayer);
-            if(results.length) {
-              view.popup.open({
-                location: event.mapPoint,
-                features: [results[0].graphic]
-              });
-            } else {
-              view.popup.close();
-            }
-          });
-        });
-      });
     });
   </script>
 </body>
