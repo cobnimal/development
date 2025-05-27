@@ -19,9 +19,15 @@
   <div id="viewDiv"></div>
 
   <script>
-    require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer", "esri/Graphic", "esri/layers/GraphicsLayer", "esri/renderers/HeatmapRenderer"], function(Map, MapView, FeatureLayer, Graphic, GraphicsLayer, HeatmapRenderer) {
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/renderers/HeatmapRenderer"
+    ], function(Map, MapView, FeatureLayer, GraphicsLayer, Graphic, HeatmapRenderer) {
 
-      // Parse data from URL
       function getDataFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const dataParam = urlParams.get('data');
@@ -34,15 +40,8 @@
 
       const data = getDataFromUrl();
 
-      const fields = [
-        { name: "ObjectID", type: "oid" },
-        { name: "latitude", type: "double" },
-        { name: "longitude", type: "double" },
-        { name: "weight", type: "double" }
-      ];
-
       const graphics = data.map((item, index) => {
-        return new Graphic({
+        return {
           geometry: {
             type: "point",
             latitude: item.lat,
@@ -54,36 +53,44 @@
             longitude: item.lon,
             weight: item.weight
           }
-        });
+        };
       });
 
-      // Heatmap Layer
-      const heatmapLayer = new GraphicsLayer({
-        graphics: graphics,
+      const heatmapLayer = new FeatureLayer({
+        source: graphics,
+        objectIdField: "ObjectID",
+        fields: [
+          { name: "ObjectID", type: "oid" },
+          { name: "latitude", type: "double" },
+          { name: "longitude", type: "double" },
+          { name: "weight", type: "double" }
+        ],
+        geometryType: "point",
+        spatialReference: { wkid: 4326 },
         renderer: new HeatmapRenderer({
           field: "weight",
           colorStops: [
             { ratio: 0, color: "rgba(63, 40, 102, 0)" },
-            { ratio: 0.2, color: "rgb(0, 0, 255)" },
-            { ratio: 0.4, color: "rgb(0, 255, 255)" },
-            { ratio: 0.6, color: "rgb(0, 255, 0)" },
+            { ratio: 0.2, color: "blue" },
+            { ratio: 0.4, color: "cyan" },
+            { ratio: 0.6, color: "lime" },
             { ratio: 0.8, color: "yellow" },
-            { ratio: 1, color: "rgb(255, 0, 0)" }
+            { ratio: 1, color: "red" }
           ],
           maxPixelIntensity: 25,
           minPixelIntensity: 0
         })
       });
 
-      // Transparent layer to enable interactivity
-      const transparentPointLayer = new GraphicsLayer({
-        graphics: graphics,
-        opacity: 0  // Invisible but interactive
+      // Transparent point layer for popups
+      const transparentLayer = new GraphicsLayer({
+        graphics: graphics.map(g => new Graphic(g)),
+        opacity: 0
       });
 
       const map = new Map({
         basemap: "gray-vector",
-        layers: [heatmapLayer, transparentPointLayer]
+        layers: [heatmapLayer, transparentLayer]
       });
 
       const view = new MapView({
@@ -96,10 +103,7 @@
       view.when(() => {
         view.on("pointer-move", function(event) {
           view.hitTest(event).then(function(response) {
-            const result = response.results.find(function(result) {
-              return result.graphic.layer === transparentPointLayer;
-            });
-
+            const result = response.results.find(r => r.graphic.layer === transparentLayer);
             if (result) {
               const attrs = result.graphic.attributes;
               view.popup.open({
