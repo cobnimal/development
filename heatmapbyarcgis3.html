@@ -1,166 +1,140 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>ArcGIS Heatmap with Clickable Points</title>
-  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
-  <script src="https://js.arcgis.com/4.29/"></script>
-  <style>
-    html, body, #viewDiv { height: 100%; width: 100%; margin: 0; padding: 0; }
-  </style>
-</head>
-<body>
-  <div id="viewDiv"></div>
-  <script>
-    // Parse 'data' from URL (JSON-encoded)
-    function getDataFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      const raw = params.get("data");
-      if (!raw) return [];
-
-      try {
-        const decoded = decodeURIComponent(raw);
-        return JSON.parse(decoded);
-      } catch (e) {
-        console.error("Invalid 'data' parameter", e);
-        return [];
+  <head>
+    <meta charset="utf-8" />
+    <title>ArcGIS Heatmap with Hover Popup</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
+    <script src="https://js.arcgis.com/4.29/"></script>
+    <style>
+      html, body, #viewDiv {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
       }
-    }
+    </style>
+  </head>
+  <body>
+    <div id="viewDiv"></div>
+    <script>
+      function getDataFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get("data");
+        if (!raw) return [];
 
-    const data = getDataFromUrl();
-
-    require([
-      "esri/Map",
-      "esri/views/MapView",
-      "esri/layers/FeatureLayer",
-      "esri/Graphic"
-    ], function (Map, MapView, FeatureLayer, Graphic) {
-
-      const map = new Map({
-        basemap: "streets-night-vector"
-      });
-
-      const view = new MapView({
-        container: "viewDiv",
-        map: map,
-        center: [-79.7596, 43.6850],
-        zoom: 14
-      });
-
-      const graphics = data.map((item, index) => {
-        return new Graphic({
-          geometry: {
-            type: "point",
-            latitude: item.lat,
-            longitude: item.lon
-          },
-          attributes: {
-            ObjectID: index + 1,
-            weight: item.weight || 1,
-            latitude: item.lat,
-            longitude: item.lon
-          }
-        });
-      });
-
-      // Heatmap Layer (not clickable)
-      const heatmapLayer = new FeatureLayer({
-        source: graphics,
-        objectIdField: "ObjectID",
-        fields: [
-          { name: "ObjectID", type: "oid" },
-          { name: "weight", type: "double" }
-        ],
-        geometryType: "point",
-        spatialReference: { wkid: 4326 },
-        renderer: {
-          type: "heatmap",
-          field: "weight",
-          colorStops: [
-            { ratio: 0, color: "rgba(255,255,255,0)" },
-            { ratio: 0.2, color: "cyan" },
-            { ratio: 0.5, color: "blue" },
-            { ratio: 0.8, color: "red" },
-            { ratio: 1, color: "yellow" }
-          ],
-          maxPixelIntensity: 10,
-          minPixelIntensity: 0
+        try {
+          return JSON.parse(decodeURIComponent(raw));
+        } catch (e) {
+          console.error("Invalid 'data' parameter", e);
+          return [];
         }
-      });
+      }
 
-      // Transparent Point Layer (clickable with popups)
-      const pointLayer = new FeatureLayer({
-                                            source: graphics,
-                                            objectIdField: "ObjectID",
-                                            fields: [
-                                              { name: "ObjectID", type: "oid" },
-                                              { name: "weight", type: "double" },
-                                              { name: "latitude", type: "double" },
-                                              { name: "longitude", type: "double" }
-                                            ],
-                                            geometryType: "point",
-                                            spatialReference: { wkid: 4326 },
-                                            renderer: {
-                                              type: "simple",
-                                              symbol: {
-                                                type: "simple-marker",
-                                                size: 8,
-                                                color: "rgba(255,255,255,0.01)", // invisible but clickable
-                                                outline: null
-                                              }
-                                            },
-                                            popupTemplate: {
-                                              title: "Point Details",
-                                              content: `
-                                                <b>Latitude:</b> {latitude}<br/>
-                                                <b>Longitude:</b> {longitude}<br/>
-                                                <b>Weight:</b> {weight}
-                                              `
-                                            }
-                                          });
+      const data = getDataFromUrl();
 
-                            //map.add(heatmapLayer);
-                            //map.add(pointLayer);
+      require([
+        "esri/Map",
+        "esri/views/MapView",
+        "esri/layers/FeatureLayer",
+        "esri/Graphic"
+      ], function(Map, MapView, FeatureLayer, Graphic) {
 
-                            map.addMany([heatmapLayer, pointLayer]);
-
-      // Hover logic
-view.whenLayerView(transparentPointLayer).then(function(layerView) {
-        let lastId = null;
-
-        view.on("pointer-move", function(event) {
-          view.hitTest(event).then(function(response) {
-            const result = response.results.find(r => r.graphic?.layer === transparentPointLayer);
-
-            if (result && result.graphic.attributes.ObjectID !== lastId) {
-              lastId = result.graphic.attributes.ObjectID;
-              const attrs = result.graphic.attributes;
-
-              view.popup.open({
-                location: result.mapPoint,
-                title: "Point Details",
-                content: `
-                  <b>Latitude:</b> ${attrs.latitude}<br/>
-                  <b>Longitude:</b> ${attrs.longitude}<br/>
-                  <b>Weight:</b> ${attrs.weight}
-                `
-              });
-            } else if (!result) {
-              lastId = null;
-              view.popup.close();
+        const graphics = data.map((item, index) => {
+          return new Graphic({
+            geometry: {
+              type: "point",
+              longitude: item.lon,
+              latitude: item.lat
+            },
+            attributes: {
+              ObjectID: index + 1,
+              latitude: item.lat,
+              longitude: item.lon,
+              weight: item.weight || 1
             }
           });
         });
+
+        const fields = [
+          { name: "ObjectID", type: "oid" },
+          { name: "latitude", type: "double" },
+          { name: "longitude", type: "double" },
+          { name: "weight", type: "double" }
+        ];
+
+        const heatmapLayer = new FeatureLayer({
+          source: graphics,
+          fields: fields,
+          objectIdField: "ObjectID",
+          geometryType: "point",
+          renderer: {
+            type: "heatmap",
+            field: "weight"
+          }
+        });
+
+        const transparentPointLayer = new FeatureLayer({
+          source: graphics,
+          fields: fields,
+          objectIdField: "ObjectID",
+          geometryType: "point",
+          renderer: {
+            type: "simple",
+            symbol: {
+              type: "simple-marker",
+              color: [255, 255, 255, 0.01], // almost invisible
+              size: 20,
+              outline: null
+            }
+          }
+        });
+
+        const map = new Map({
+          basemap: "streets-night-vector",
+          layers: [heatmapLayer, transparentPointLayer] // important: layers are added here
+        });
+
+        const view = new MapView({
+          container: "viewDiv",
+          map: map,
+          center: [-79.75, 43.69],
+          zoom: 13
+        });
+
+        view.when(() => {
+          // Only run after view is fully initialized
+          view.whenLayerView(transparentPointLayer).then((layerView) => {
+            let lastId = null;
+
+            view.on("pointer-move", (event) => {
+              view.hitTest(event).then((response) => {
+                const result = response.results.find(
+                  (r) => r.graphic?.layer === transparentPointLayer
+                );
+
+                if (result && result.graphic.attributes.ObjectID !== lastId) {
+                  lastId = result.graphic.attributes.ObjectID;
+                  const attrs = result.graphic.attributes;
+
+                  view.popup.open({
+                    location: result.mapPoint,
+                    title: "Point Details",
+                    content: `
+                      <b>Latitude:</b> ${attrs.latitude}<br/>
+                      <b>Longitude:</b> ${attrs.longitude}<br/>
+                      <b>Weight:</b> ${attrs.weight}
+                    `
+                  });
+                } else if (!result) {
+                  view.popup.close();
+                  lastId = null;
+                }
+              });
+            });
+          });
+        });
       });
-
-
-
-      
-
-
-
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
