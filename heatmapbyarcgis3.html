@@ -91,38 +91,39 @@
 
       // Transparent Point Layer (clickable with popups)
       const pointLayer = new FeatureLayer({
-  source: graphics,
-  objectIdField: "ObjectID",
-  fields: [
-    { name: "ObjectID", type: "oid" },
-    { name: "weight", type: "double" },
-    { name: "latitude", type: "double" },
-    { name: "longitude", type: "double" }
-  ],
-  geometryType: "point",
-  spatialReference: { wkid: 4326 },
-  renderer: {
-    type: "simple",
-    symbol: {
-      type: "simple-marker",
-      size: 8,
-      color: "rgba(255,255,255,0.01)", // invisible but clickable
-      outline: null
-    }
-  },
-  popupTemplate: {
-    title: "Point Details",
-    content: `
-      <b>Latitude:</b> {latitude}<br/>
-      <b>Longitude:</b> {longitude}<br/>
-      <b>Weight:</b> {weight}
-    `
-  }
-});
+                                            source: graphics,
+                                            objectIdField: "ObjectID",
+                                            fields: [
+                                              { name: "ObjectID", type: "oid" },
+                                              { name: "weight", type: "double" },
+                                              { name: "latitude", type: "double" },
+                                              { name: "longitude", type: "double" }
+                                            ],
+                                            geometryType: "point",
+                                            spatialReference: { wkid: 4326 },
+                                            renderer: {
+                                              type: "simple",
+                                              symbol: {
+                                                type: "simple-marker",
+                                                size: 8,
+                                                color: "rgba(255,255,255,0.01)", // invisible but clickable
+                                                outline: null
+                                              }
+                                            },
+                                            popupTemplate: {
+                                              title: "Point Details",
+                                              content: `
+                                                <b>Latitude:</b> {latitude}<br/>
+                                                <b>Longitude:</b> {longitude}<br/>
+                                                <b>Weight:</b> {weight}
+                                              `
+                                            }
+                                          });
 
+                            //map.add(heatmapLayer);
+                            //map.add(pointLayer);
 
-      map.add(heatmapLayer);
-      map.add(pointLayer);
+                            map.addMany([heatmapLayer, pointLayer]);
 
     });
   </script>
