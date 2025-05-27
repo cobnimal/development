@@ -125,6 +125,32 @@
 
                             map.addMany([heatmapLayer, pointLayer]);
 
+      // Hover logic
+      let lastFeatureId = null;
+
+      view.on("pointer-move", function (event) {
+        view.hitTest(event).then(function (response) {
+          const result = response.results.find(r => r.graphic.layer === pointLayer);
+          if (result && result.graphic.attributes.ObjectID !== lastFeatureId) {
+            lastFeatureId = result.graphic.attributes.ObjectID;
+
+            view.popup.open({
+              title: "Point Details",
+              content: `
+                <b>Latitude:</b> ${result.graphic.attributes.latitude}<br/>
+                <b>Longitude:</b> ${result.graphic.attributes.longitude}<br/>
+                <b>Weight:</b> ${result.graphic.attributes.weight}
+              `,
+              location: result.graphic.geometry
+            });
+          } else if (!result) {
+            lastFeatureId = null;
+            view.popup.close();
+          }
+        });
+      });
+
+
     });
   </script>
 </body>
