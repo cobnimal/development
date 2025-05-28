@@ -26,8 +26,9 @@
       "esri/layers/GraphicsLayer",
       "esri/Graphic",
       "esri/renderers/HeatmapRenderer",
-      "esri/tasks/Locator"
-    ], function(Map, MapView, FeatureLayer, GraphicsLayer, Graphic, HeatmapRenderer, Locator) {
+      "esri/rest/locator",
+      "esri/geometry/Point"
+    ], function(Map, MapView, FeatureLayer, GraphicsLayer, Graphic, HeatmapRenderer, locator, Point) {
 
       function getDataFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -100,9 +101,7 @@
         zoom: 12
       });
 
-      const locator = new Locator({
-        url: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer"
-      });
+      const geocodeUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
 
       view.when(() => {
         view.on("pointer-move", function(event) {
@@ -112,29 +111,29 @@
               const attrs = result.graphic.attributes;
               const point = result.mapPoint;
 
-              locator.locationToAddress(point)
-                .then(function(geocodeResult) {
-                  view.popup.open({
-                    location: point,
-                    title: "Address Info",
-                    content: `
-                      <b>Address:</b> ${geocodeResult.address ?? "N/A"}<br>
-                      <b>Weight:</b> ${attrs.weight ?? "N/A"}
-                    `
-                  });
-                })
-                .catch(function() {
-                  // If reverse geocoding fails, show coordinates
-                  view.popup.open({
-                    location: point,
-                    title: "Point Info",
-                    content: `
-                      <b>Lat:</b> ${attrs.latitude ?? 'N/A'}<br>
-                      <b>Lon:</b> ${attrs.longitude ?? 'N/A'}<br>
-                      <b>Weight:</b> ${attrs.weight ?? 'N/A'}
-                    `
-                  });
+              locator.locationToAddress(geocodeUrl, {
+                location: point
+              }).then(function(geocodeResult) {
+                view.popup.open({
+                  location: point,
+                  title: "Address Info",
+                  content: `
+                    <b>Address:</b> ${geocodeResult.address ?? "N/A"}<br>
+                    <b>Weight:</b> ${attrs.weight ?? "N/A"}
+                  `
                 });
+              }).catch(function() {
+                // Fallback to coordinates
+                view.popup.open({
+                  location: point,
+                  title: "Point Info",
+                  content: `
+                    <b>Lat:</b> ${attrs.latitude ?? 'N/A'}<br>
+                    <b>Lon:</b> ${attrs.longitude ?? 'N/A'}<br>
+                    <b>Weight:</b> ${attrs.weight ?? 'N/A'}
+                  `
+                });
+              });
             } else {
               view.popup.close();
             }
