@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ArcGIS Heatmap with Address Popup</title>
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
+  <script src="https://js.arcgis.com/4.29/"></script>
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewDiv"></div>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/renderers/HeatmapRenderer",
+      "esri/rest/locator",
+      "esri/geometry/Point"
+    ], function(Map, MapView, FeatureLayer, GraphicsLayer, Graphic, HeatmapRenderer, locator, Point) {
+
+      function getDataFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get('data');
+        try {
+          return JSON.parse(decodeURIComponent(dataParam));
+        } catch {
+          return [];
+        }
+      }
+
+      const data = getDataFromUrl();
+
+      const graphics = data.map((item, index) => {
+        return {
+          geometry: {
+            type: "point",
+            latitude: item.lat,
+            longitude: item.lon
+          },
+          attributes: {
+            ObjectID: index + 1,
+            latitude: item.lat,
+            longitude: item.lon,
+            weight: item.weight
+          }
+        };
+      });
+
+      const heatmapLayer = new FeatureLayer({
+        source: graphics,
+        objectIdField: "ObjectID",
+        fields: [
+          { name: "ObjectID", type: "oid" },
+          { name: "latitude", type: "double" },
+          { name: "longitude", type: "double" },
+          { name: "weight", type: "double" }
+        ],
+        geometryType: "point",
+        spatialReference: { wkid: 4326 },
+        renderer: new HeatmapRenderer({
+          field: "weight",
+          colorStops: [
+            { ratio: 0, color: "rgba(63, 40, 102, 0)" },
+            { ratio: 0.2, color: "blue" },
+            { ratio: 0.4, color: "cyan" },
+            { ratio: 0.6, color: "lime" },
+            { ratio: 0.8, color: "yellow" },
+            { ratio: 1, color: "red" }
+          ],
+          // ✅ Use new properties
+          maxDensity: 0.01,
+          minDensity: 0
+        })
+      });
+
+      const transparentLayer = new GraphicsLayer({
+        graphics: graphics.map(g => new Graphic(g)),
+        opacity: 0
+      });
+
+      const map = new Map({
+        basemap: "streets", // ✅ Better visibility
+        layers: [heatmapLayer, transparentLayer]
+      });
+
+      const view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [-79.74, 43.69],
+        zoom: 12,
+        popup: {} // ✅ Ensures popup is initialized
+      });
+
+      const geocodeUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+
+      view.when(() => {
+        view.on("pointer-move", function(event) {
+          view.hitTest(event).then(function(response) {
+            const result = response.results.find(r => r.graphic.layer === transparentLayer);
+            if (result) {
+              const attrs = result.graphic.attributes;
+              const point = result.mapPoint;
+
+              locator.locationToAddress(geocodeUrl, {
+                location: point
+              }).then(function(geocodeResult) {
+                view.popup.open({
+                  location: point,
+                  title: "Address Info",
+                  content: `
+                    <b>Address:</b> ${geocodeResult.address ?? "N/A"}<br>
+                    <b>Weight:</b> ${attrs.weight ?? "N/A"}`
+                });
+              }).catch(function() {
+                // Fallback to coordinates
+                view.popup.open({
+                  location: point,
+                  title: "Point Info",
+                  content: `
+                    <b>Lat:</b> ${attrs.latitude ?? 'N/A'}<br>
+                    <b>Lon:</b> ${attrs.longitude ?? 'N/A'}<br>
+                    <b>Weight:</b> ${attrs.weight ?? 'N/A'}
+                  `
+                });
+              });
+            } else {
+              view.closePopup(); // ✅ Replaces deprecated view.popup.close()
+            }
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>
